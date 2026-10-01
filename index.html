@@ -99,6 +99,10 @@
           </div>
           <button id="home-withdraw-btn" class="bg-white text-black font-semibold px-6 py-2 rounded-lg">Withdraw</button>
         </div>
+        <section class="card-bg p-4 rounded-lg">
+          <h2 class="text-lg font-semibold text-accent mb-2">Notice</h2>
+          <div id="home-admin-notice" class="text-sm text-gray-300 whitespace-pre-wrap">No notice available.</div>
+        </section>
 
         <section>
           <div class="flex justify-between items-center">
@@ -127,7 +131,7 @@
                 <span class="text-3xl">Ã¢ÂÂ³</span>
                 <div>
                   <h3 class="font-semibold">Daily Task Click</h3>
-                  <p class="text-xs text-gray-400">Wait 30 Seconds</p>
+                  <p class="text-xs text-gray-400">Wait 20 Seconds</p>
                 </div>
               </div>
               <button class="bg-white text-black font-bold px-6 py-2 rounded-lg text-sm btn" onclick="claimReward('dailyClick')">Start</button>
@@ -160,7 +164,7 @@
                 <span class="text-3xl">ðŸŽ¯</span>
                 <div>
                   <h3 class="font-semibold">Special Task Click</h3>
-                  <p class="text-xs text-gray-400">Complete Special Task</p>
+                  <p class="text-xs text-gray-400">300 Coins · 30 seconds · 12-hour cooldown (max 2/day)</p>
                 </div>
               </div>
               <button class="bg-purple-600 text-white font-bold px-6 py-2 rounded-lg text-sm btn" onclick="claimReward('specialTask')">Click</button>
@@ -171,7 +175,7 @@
                 <span class="text-3xl">Ã°Å¸Å½Â®</span>
                 <div>
                   <h3 class="font-semibold">Play Mini App</h3>
-                  <p class="text-xs text-gray-400">Get a big reward!</p>
+                  <p class="text-xs text-gray-400">300 Coins · 30 seconds · 12-hour cooldown (max 2/day)</p>
                 </div>
               </div>
               <button class="bg-green-600 text-white font-bold px-6 py-2 rounded-lg text-sm btn" onclick="claimReward('miniApp')">Play</button>
@@ -215,6 +219,21 @@
             <button id="copy-code-btn" class="ml-4"><i data-lucide="copy" class="w-6 h-6 text-gray-400"></i></button>
           </div>
           <p class="text-sm text-gray-300">Share the code with your friends.</p>
+          <p class="text-gray-400 text-sm mt-4 mb-2">Direct Referral Link</p>
+          <div class="flex gap-2">
+            <input id="referral-link" readonly class="input-field min-w-0 flex-1 p-2 rounded-lg text-xs">
+            <button id="copy-referral-link-btn" class="btn-outline-accent px-3 rounded-lg">Copy Link</button>
+          </div>
+        </div>
+
+        <div class="card-bg p-4 rounded-lg">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold">Your Referrals</h3>
+            <span class="text-accent font-bold"><span id="referral-count">0</span> users</span>
+          </div>
+          <div id="referral-users-list" class="space-y-2 text-sm text-gray-300">
+            <p class="text-gray-400">Loading referrals...</p>
+          </div>
         </div>
 
         <button id="share-btn" class="w-full p-3 rounded-lg btn-accent">Share Your Code</button>
@@ -233,6 +252,12 @@
           <h2 id="profile-name" class="text-xl font-bold">User Name</h2>
           <p id="profile-email" class="text-gray-400">user@email.com</p>
         </div>
+        <section class="card-bg p-4 rounded-lg">
+          <h3 class="text-lg font-semibold text-accent mb-3">Top 3 Users by Coins</h3>
+          <div id="coin-leaderboard" class="space-y-3 text-sm">
+            <p class="text-gray-400">Loading leaderboard...</p>
+          </div>
+        </section>
         <button id="logout-btn" class="w-full mt-6 p-3 rounded-lg bg-red-600 text-white font-bold">Logout</button>
       </div>
 
@@ -411,8 +436,11 @@
       profileNameEl.textContent = userData.name || "No Name";
       profileEmailEl.textContent = userData.email || "No Email";
       referralCodeEl.textContent = userData.referralCode || "...";
+      const referralUrl = new URL(window.location.href);
+      referralUrl.searchParams.set("ref", userData.referralCode || "");
+      document.getElementById("referral-link").value = referralUrl.toString();
       minWithdrawalInfoEl.textContent = `${appConfig.minWithdrawal || 5000} Coins`;
-      coinValueInfoEl.textContent = `${appConfig.coinValueCoins || 1000} Coins = Ã Â§Â³${appConfig.coinValueInr || 10}`;
+      coinValueInfoEl.textContent = "";
 
       withdrawMethodSelect.innerHTML = "";
       (appConfig.paymentMethods || []).forEach((method) => {
@@ -423,6 +451,8 @@
       });
 
       updateDynamicPaymentFields();
+      const noticeEl = document.getElementById("home-admin-notice");
+      if (noticeEl) noticeEl.textContent = (appConfig.homeNotice || "").trim() || "No notice available.";
       updateAdsLeftCount();
     }
 
@@ -432,6 +462,7 @@
     }
 
     function navigateTo(pageId) {
+      if (pageId === "profile-page") loadCoinLeaderboard();
       document.querySelectorAll(".sub-page").forEach(p => p.classList.remove("active"));
       document.getElementById(pageId).classList.add("active");
       document.querySelectorAll(".nav-link").forEach(link => {
@@ -463,6 +494,8 @@
           e.preventDefault();
           const pageId = link.dataset.page;
           if (pageId === 'wallet-page') loadWithdrawalHistory();
+          if (pageId === 'refer-page') loadReferralUsers();
+          if (pageId === 'refer-page') loadReferralUsers();
           navigateTo(pageId);
         });
       });
@@ -473,6 +506,7 @@
       });
 
       document.getElementById('copy-code-btn').addEventListener('click', copyReferralCode);
+      document.getElementById('copy-referral-link-btn').addEventListener('click', copyReferralLink);
       document.getElementById('share-btn').addEventListener('click', shareReferralCode);
       document.getElementById('withdraw-btn').addEventListener('click', handleWithdrawal);
       document.getElementById('home-withdraw-btn').addEventListener('click', () => navigateTo('wallet-page'));
@@ -505,6 +539,10 @@
           lastAdWatchDate: new Date().toISOString().split('T')[0],
           isBlocked: false
         }, { merge: true });
+        const referralFromUrl = new URLSearchParams(window.location.search).get("ref");
+        if (referralFromUrl) {
+          await applyReferralBonus(referralFromUrl.trim().toUpperCase(), false);
+        }
       } catch (e) {
         console.error("signup error:", e);
         showAlert(e.message);
@@ -610,6 +648,38 @@
         try { await updateBalance(amount); } catch (_) {}
       } finally {
         showLoader(false);
+      }
+    }
+
+    async function loadCoinLeaderboard() {
+      const listEl = document.getElementById("coin-leaderboard");
+      if (!listEl) return;
+      listEl.innerHTML = '<p class="text-gray-400">Loading leaderboard...</p>';
+      try {
+        const q = query(collection(db, "users"), orderBy("balance", "desc"), limit(3));
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          listEl.innerHTML = '<p class="text-gray-400">No users found.</p>';
+          return;
+        }
+        listEl.innerHTML = "";
+        const medals = ["🥇", "🥈", "🥉"];
+        snap.docs.forEach((d, i) => {
+          const u = d.data();
+          const row = document.createElement("div");
+          row.className = "card-bg p-3 rounded-lg flex items-center justify-between";
+          const name = document.createElement("span");
+          name.className = "font-semibold";
+          name.textContent = `${medals[i]} ${u.name || "User"}`;
+          const coins = document.createElement("span");
+          coins.className = "font-bold text-accent";
+          coins.textContent = `${Number(u.balance || 0).toLocaleString()} Coins`;
+          row.append(name, coins);
+          listEl.appendChild(row);
+        });
+      } catch (e) {
+        console.error("leaderboard error:", e);
+        listEl.innerHTML = '<p class="text-red-400">Leaderboard could not be loaded.</p>';
       }
     }
 
@@ -733,6 +803,46 @@
       }
     }
 
+    async function loadReferralUsers() {
+      const countEl = document.getElementById("referral-count");
+      const listEl = document.getElementById("referral-users-list");
+      if (!currentUser || !userData?.referralCode) return;
+      listEl.innerHTML = '<p class="text-gray-400">Loading referrals...</p>';
+      try {
+        const q = query(collection(db, "users"), where("referredBy", "==", userData.referralCode));
+        const snap = await getDocs(q);
+        countEl.textContent = snap.size;
+        if (snap.empty) {
+          listEl.innerHTML = '<p class="text-gray-400">No referrals yet.</p>';
+          return;
+        }
+        listEl.innerHTML = "";
+        snap.forEach((d, index) => {
+          const referredUser = d.data();
+          const row = document.createElement("div");
+          row.className = "bg-gray-800 p-3 rounded-lg flex items-center justify-between gap-3";
+          const number = document.createElement("span");
+          number.className = "text-accent font-semibold";
+          number.textContent = `${index + 1}.`;
+          const email = document.createElement("span");
+          email.className = "break-all";
+          email.textContent = referredUser.email || "Email unavailable";
+          row.append(number, email);
+          listEl.appendChild(row);
+        });
+      } catch (e) {
+        console.error("loadReferralUsers error:", e);
+        listEl.innerHTML = '<p class="text-red-400">Could not load referrals. Check Firestore rules.</p>';
+      }
+    }
+
+    function copyReferralLink() {
+      const link = document.getElementById("referral-link").value;
+      navigator.clipboard.writeText(link).then(() => {
+        showAlert("Referral link copied!");
+      }).catch(() => showAlert("Failed to copy referral link."));
+    }
+
     function copyReferralCode() {
       const textToCopy = referralCodeEl.textContent;
       navigator.clipboard.writeText(textToCopy).then(() => {
@@ -744,9 +854,11 @@
 
     function shareReferralCode() {
       if (!userData) return;
+      const referralUrl = new URL(window.location.href);
+      referralUrl.searchParams.set("ref", userData.referralCode);
       const text = `Join TAKA999 and earn money! Use my referral code: ${userData.referralCode}`;
       if (navigator.share) {
-        navigator.share({ title: 'Join TAKA999!', text, url: window.location.href })
+        navigator.share({ title: 'Join TAKA999!', text, url: referralUrl.toString() })
           .catch((e) => console.error("Share failed:", e));
       } else {
         copyReferralCode();
@@ -779,12 +891,43 @@
     async function finalizeTask(rewardAmount) {
       const userRef = doc(db, "users", currentUser.uid);
       const newCount = (userData.dailyAdCount || 0) + 1;
-      await updateDoc(userRef, { dailyAdCount: newCount });
+      const update = { dailyAdCount: newCount };
       userData.dailyAdCount = newCount;
+      const task = window.pendingTimedTask;
+      if (task === "specialTask" || task === "miniApp") {
+        const prefix = task === "specialTask" ? "specialTask" : "miniApp";
+        const today = new Date().toISOString().split("T")[0];
+        const dateField = `${prefix}ClaimDate`;
+        const countField = `${prefix}DailyCount`;
+        const count = userData[dateField] === today ? Number(userData[countField] || 0) : 0;
+        update[`${prefix}LastClaimAt`] = Date.now();
+        update[dateField] = today;
+        update[countField] = count + 1;
+        userData[`${prefix}LastClaimAt`] = Date.now();
+        userData[dateField] = today;
+        userData[countField] = count + 1;
+        window.pendingTimedTask = null;
+      }
+      await updateDoc(userRef, update);
 
       await updateBalance(rewardAmount);
       showAlert(`Task Completed! You received ${rewardAmount} coins.`);
       updateAdsLeftCount();
+    }
+
+    async function canClaimTimedTask(taskType) {
+      const prefix = taskType === "specialTask" ? "specialTask" : "miniApp";
+      const last = Number(userData[`${prefix}LastClaimAt`] || 0);
+      const now = Date.now();
+      if (last && now - last < 12 * 60 * 60 * 1000) {
+        const remaining = 12 * 60 * 60 * 1000 - (now - last);
+        showAlert(`Please wait ${Math.floor(remaining / 3600000)}h ${Math.ceil((remaining % 3600000) / 60000)}m before trying again.`);
+        return false;
+      }
+      const today = new Date().toISOString().split("T")[0];
+      const count = userData[`${prefix}ClaimDate`] === today ? Number(userData[`${prefix}DailyCount`] || 0) : 0;
+      if (count >= 2) { showAlert("Daily limit reached. Please try again tomorrow."); return false; }
+      return true;
     }
 
     // UPDATED REWARD SYSTEM
@@ -805,22 +948,26 @@
       }
 
       // Handle New Tasks with Timers
+      if (taskType === "specialTask" || taskType === "miniApp") {
+        if (!(await canClaimTimedTask(taskType))) return;
+      }
+
       if (taskType === 'dailyClick') {
         // Daily Task Click: 30 seconds wait, Reward 50
-        startTimerTask(30, 50, 'dailyClick', 'https://taka999only.blogspot.com'); // Placeholder link
+        startTimerTask(20, 50, 'dailyClick', 'https://omg10.com/4/8740452');
         return;
       }
 
       if (taskType === 'websiteVisit') {
         // Website Visit: 20 seconds wait, Reward 50
-        startTimerTask(20, 50, 'websiteVisit', 'https://taka999only.blogspot.com'); // Placeholder link
+        startTimerTask(20, 50, 'websiteVisit', 'https://omg10.com/4/8740452');
         return;
       }
 
       // Special Task Click
       if (taskType === 'specialTask') {
-        window.open('https://omg10.com/4/8740452', '_blank');
-        startTimerTask(20, 50, 'specialTask');
+        window.pendingTimedTask = "specialTask";
+        startTimerTask(30, 300, 'specialTask', 'https://omg10.com/4/8740452');
         return;
       }
 
@@ -839,13 +986,21 @@
         }
 
         await adPromise;
-        const newCount = (userData.dailyAdCount || 0) + 1;
-        await updateDoc(userRef, { dailyAdCount: newCount });
-        userData.dailyAdCount = newCount;
+        if (taskType !== "miniApp") {
+          const newCount = (userData.dailyAdCount || 0) + 1;
+          await updateDoc(userRef, { dailyAdCount: newCount });
+          userData.dailyAdCount = newCount;
+        }
 
         let rewardAmount = 50;
-        if (taskType === 'miniApp') rewardAmount = 100;
+        if (taskType === 'miniApp') rewardAmount = 300;
 
+        if (taskType === "miniApp") {
+          showLoader(false);
+          window.pendingTimedTask = "miniApp";
+          startTimerTask(30, rewardAmount, "miniApp");
+          return;
+        }
         await updateBalance(rewardAmount);
         showAlert(`Congratulations! You have won ${rewardAmount} coins.`);
         updateAdsLeftCount();
