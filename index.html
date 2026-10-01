@@ -685,39 +685,54 @@
 
     async function loadWithdrawalHistory() {
       const historyList = document.getElementById('withdrawal-history-list');
+      if (!historyList) return;
+      if (!currentUser) {
+        historyList.innerHTML = '<p class="text-gray-400 text-center">Please log in to view withdrawal history.</p>';
+        return;
+      }
       historyList.innerHTML = '<p class="text-gray-400">Loading history...</p>';
-      const q = query(
-        collection(db, "withdrawals"),
-        where("userId", "==", currentUser.uid),
-        orderBy("requestedAt", "desc")
-      );
       try {
+        // Avoid a composite Firestore index requirement; sort results in the browser.
+        const q = query(
+          collection(db, "withdrawals"),
+          where("userId", "==", currentUser.uid)
+        );
         const snap = await getDocs(q);
         if (snap.empty) {
           historyList.innerHTML = '<p class="text-gray-400 text-center">You haven\'t made any withdrawals yet.</p>';
           return;
         }
+        const records = snap.docs.map(d => d.data()).sort((a, b) => {
+          const timeA = a.requestedAt?.toDate ? a.requestedAt.toDate().getTime() : 0;
+          const timeB = b.requestedAt?.toDate ? b.requestedAt.toDate().getTime() : 0;
+          return timeB - timeA;
+        });
         historyList.innerHTML = '';
-        snap.forEach(d => {
-          const r = d.data();
-          const status = r.status || "pending";
+        records.forEach(r => {
+          const status = String(r.status || "pending").toLowerCase();
           let statusColor = 'text-yellow-400';
           if (status === 'approved') statusColor = 'text-green-400';
           else if (status === 'rejected') statusColor = 'text-red-400';
-          const date = r.requestedAt?.toDate ? r.requestedAt.toDate().toLocaleDateString() : 'N/A';
-          historyList.innerHTML += `
-            <div class="card-bg p-3 rounded-lg flex items-center justify-between">
-              <div>
-                <p class="font-semibold">${r.amount} Coins - ${r.method}</p>
-                <p class="text-xs text-gray-400">${date}</p>
-              </div>
-              <p class="font-bold ${statusColor} capitalize">${status}</p>
-            </div>
-          `;
+          const date = r.requestedAt?.toDate ? r.requestedAt.toDate().toLocaleString() : 'Pending date';
+          const item = document.createElement('div');
+          item.className = 'card-bg p-3 rounded-lg flex items-center justify-between';
+          const details = document.createElement('div');
+          const amount = document.createElement('p');
+          amount.className = 'font-semibold';
+          amount.textContent = `${r.amount ?? 0} Coins - ${r.method || 'N/A'}`;
+          const dateEl = document.createElement('p');
+          dateEl.className = 'text-xs text-gray-400';
+          dateEl.textContent = date;
+          details.append(amount, dateEl);
+          const statusEl = document.createElement('p');
+          statusEl.className = `font-bold ${statusColor} capitalize`;
+          statusEl.textContent = status;
+          item.append(details, statusEl);
+          historyList.appendChild(item);
         });
       } catch (e) {
         console.error("history error:", e);
-        historyList.innerHTML = '<p class="text-red-400 text-center">Error loading history.</p>';
+        historyList.innerHTML = '<p class="text-red-400 text-center">Error loading history. Please check Firestore permissions.</p>';
       }
     }
 
